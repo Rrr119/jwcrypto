@@ -1765,6 +1765,77 @@ class TestJWE(unittest.TestCase):
         with self.assertRaises(JWKeyNotFound):
             e3.deserialize(serialized, ks_swapped)
 
+    def test_key_rotation_compat(self):
+        # Old and new keys coexist in the key set during rotation:
+        # new ciphertext is encrypted for the new key (selected by kid),
+        # while old ciphertext remains decryptable via the old key.
+        old_key = jwk.JWK.generate(kty='oct', alg='A128KW', kid='key-v1')
+        new_key = jwk.JWK.generate(kty='oct', alg='A256KW', kid='key-v2')
+
+        # Ciphertext produced before the rotation, wrapped for key-v1.
+        old_payload = b'encrypted before rotation'
+        old_token = jwe.JWE(plaintext=old_payload,
+                            protected={'enc': 'A128GCM'})
+        old_token.add_recipient(old_key,
+                                header={'alg': 'A128KW', 'kid': 'key-v1'})
+        old_serialized = old_token.serialize()
+
+        # Rotate: the key set holds both the old and the new key.
+        ks = jwk.JWKSet()
+        ks.add(old_key)
+        ks.add(new_key)
+
+        # New ciphertext is wrapped for key-v2 only.
+        new_payload = b'encrypted after rotation'
+        new_token = jwe.JWE(plaintext=new_payload,
+                            protected={'enc': 'A256GCM'})
+        new_token.add_recipient(new_key,
+                                header={'alg': 'A256KW', 'kid': 'key-v2'})
+        new_serialized = new_token.serialize()
+
+        # Both old and new ciphertext decrypt with the combined key set,
+        # each recipient selected by its 'kid' header.
+        e_old = jwe.JWE()
+        e_old.deserialize(old_serialized, ks)
+        self.assertEqual(e_old.payload, old_payload)
+        self.assertEqual(e_old.jose_header['kid'], 'key-v1')
+
+        e_new = jwe.JWE()
+        e_new.deserialize(new_serialized, ks)
+        self.assertEqual(e_new.payload, new_payload)
+        self.assertEqual(e_new.jose_header['kid'], 'key-v2')
+
+        # A multi-recipient token for both key versions can be decrypted
+        # by either key, so recipients still on the old key keep working.
+        payload = b'multi-recipient during rotation'
+        multi = jwe.JWE(plaintext=payload,
+                        protected={'enc': 'A128CBC-HS256'})
+        multi.add_recipient(old_key,
+                            header={'alg': 'A128KW', 'kid': 'key-v1'})
+        multi.add_recipient(new_key,
+                            header={'alg': 'A256KW', 'kid': 'key-v2'})
+        multi_serialized = multi.serialize()
+        self.assertEqual(
+            len(json_decode(multi_serialized)['recipients']), 2)
+
+        for key in (old_key, new_key):
+            e = jwe.JWE()
+            e.deserialize(multi_serialized, key)
+            self.assertEqual(e.payload, payload)
+
+        # After the old key is retired from the set, old ciphertext no
+        # longer decrypts, but new ciphertext is unaffected.
+        ks_retired = jwk.JWKSet()
+        ks_retired.add(new_key)
+
+        e = jwe.JWE()
+        with self.assertRaises(JWKeyNotFound):
+            e.deserialize(old_serialized, ks_retired)
+
+        e = jwe.JWE()
+        e.deserialize(new_serialized, ks_retired)
+        self.assertEqual(e.payload, new_payload)
+
     def test_serialize_not_flattened(self):
         # JWE with flattened=False adds recipients in objects and in serialized
         e = jwe.JWE(E_A1_ex['plaintext'], flattened=False)
