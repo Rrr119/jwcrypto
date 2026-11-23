@@ -1,0 +1,17 @@
+{
+  "root": "/home/dev/feedback/uid36771",
+  "B": "/home/dev/feedback/uid36771",
+  "sha": "35be4698cfe6772ed4699505eebcbd1ecf4dcebe",
+  "wslDistro": "Ubuntu-26.04",
+  "source": {
+    "owner": "latchset",
+    "repo": "jwcrypto",
+    "sha": "35be4698cfe6772ed4699505eebcbd1ecf4dcebe"
+  },
+  "fork": {
+    "owner": "Rrr119",
+    "repo": "jwcrypto",
+    "cloneUrl": "https://github.com/Rrr119/jwcrypto.git"
+  },
+  "at": "2026-11-23T17:04:17.648Z"
+}

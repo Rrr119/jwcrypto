@@ -16,6 +16,7 @@ An implementation of the JOSE Working Group documents:
 - RFC 7519 - JSON Web Token (JWT)
 - RFC 7520 - Examples of Protecting Content Using JSON Object Signing and
   Encryption (JOSE)
+- RFC 9901 - Selective Disclosure for JSON Web Tokens (SD-JWT)
 
 Installation
 ============
